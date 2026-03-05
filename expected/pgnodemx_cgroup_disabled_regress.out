@@ -1,0 +1,34 @@
+/* pgnodemx regression test with cgroup_enabled = false */
+\pset pager off
+\x auto
+DROP EXTENSION IF EXISTS pgnodemx;
+NOTICE:  extension "pgnodemx" does not exist, skipping
+CREATE EXTENSION pgnodemx;
+-- cgroup mode should be 'disabled'
+SELECT cgroup_mode();
+ cgroup_mode 
+-------------
+ disabled
+(1 row)
+
+-- cgroup is disabled
+SELECT current_setting('pgnodemx.cgroup_enabled');
+ current_setting 
+-----------------
+ off
+(1 row)
+
+-- proc functions should still work with cgroup disabled
+SELECT count(*) > 0 AS has_meminfo FROM proc_meminfo();
+ has_meminfo 
+-------------
+ t
+(1 row)
+
+-- load averages should be non-negative
+SELECT load1 >= 0 AND load5 >= 0 AS loadavg_valid FROM proc_loadavg();
+ loadavg_valid 
+---------------
+ t
+(1 row)
+

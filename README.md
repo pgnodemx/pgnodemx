@@ -1,3 +1,5 @@
+[![Regression Tests](https://github.com/pgnodemx/pgnodemx/actions/workflows/regression.yml/badge.svg)](https://github.com/pgnodemx/pgnodemx/actions/workflows/regression.yml)
+
 # pgnodemx
 
 ## Overview

@@ -1,0 +1,146 @@
+name: pgnodemx regression tests
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        pg:
+          - 18
+          - 17
+          - 16
+          - 15
+          - 14
+          - 13
+          - 12
+          - 11
+          - 10
+
+    name: PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    container: pgxn/pgxn-tools
+    steps:
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Start PostgreSQL ${{ matrix.pg }}
+        run: pg-start ${{ matrix.pg }}
+
+      - name: Install build dependencies
+        # pgnodemx.c includes libpq/auth.h (for ClientAuthentication_hook),
+        # which pulls in gssapi/gssapi.h via libpq-be.h when ENABLE_GSS is set.
+        run: apt-get install -y libkrb5-dev
+
+      - name: Build and install pgnodemx
+        run: make USE_PGXS=1 && make USE_PGXS=1 install
+
+      - name: Configure shared_preload_libraries and restart
+        run: |
+          config_file=$(psql --no-psqlrc -U postgres -Atqc 'SHOW config_file')
+          echo "shared_preload_libraries = 'pgnodemx'" >> "$config_file"
+          pg_ctlcluster ${{ matrix.pg }} test restart
+
+      - name: Run regression tests
+        run: make USE_PGXS=1 installcheck
+
+      - name: Show regression.diffs
+        if: ${{ failure() }}
+        run: cat regression.diffs || true
+
+  test-cgroup-disabled:
+    strategy:
+      matrix:
+        pg:
+          - 18
+          - 17
+          - 16
+          - 15
+          - 14
+          - 13
+          - 12
+          - 11
+          - 10
+
+    name: cgroup_disabled PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    container: pgxn/pgxn-tools
+    steps:
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Start PostgreSQL ${{ matrix.pg }}
+        run: pg-start ${{ matrix.pg }}
+
+      - name: Install build dependencies
+        run: apt-get install -y libkrb5-dev
+
+      - name: Build and install pgnodemx
+        run: make USE_PGXS=1 clean && make USE_PGXS=1 && make USE_PGXS=1 install
+
+      - name: Configure shared_preload_libraries with cgroup disabled and restart
+        run: |
+          config_file=$(psql --no-psqlrc -U postgres -Atqc 'SHOW config_file')
+          echo "shared_preload_libraries = 'pgnodemx'" >> "$config_file"
+          echo "pgnodemx.cgroup_enabled = off" >> "$config_file"
+          pg_ctlcluster ${{ matrix.pg }} test restart
+
+      - name: Run cgroup-disabled regression tests
+        run: make USE_PGXS=1 installcheck REGRESS=pgnodemx_cgroup_disabled_regress
+
+      - name: Show regression.diffs
+        if: ${{ failure() }}
+        run: cat regression.diffs || true
+
+  test-subtrees:
+    strategy:
+      matrix:
+        pg:
+          - 18
+          - 17
+          - 16
+          - 15
+          - 14
+          - 13
+          - 12
+          - 11
+          - 10
+
+    name: Subtrees PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    container:
+      image: pgxn/pgxn-tools
+      options: --privileged
+    steps:
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Start PostgreSQL ${{ matrix.pg }}
+        run: pg-start ${{ matrix.pg }}
+
+      - name: Install build dependencies
+        # pgnodemx.c includes libpq/auth.h (for ClientAuthentication_hook),
+        # which pulls in gssapi/gssapi.h via libpq-be.h when ENABLE_GSS is set.
+        run: apt-get install -y libkrb5-dev
+
+      - name: Build and install pgnodemx
+        run: make USE_PGXS=1 && make USE_PGXS=1 install
+
+      - name: Configure shared_preload_libraries and restart
+        run: |
+          config_file=$(psql --no-psqlrc -U postgres -Atqc 'SHOW config_file')
+          echo "shared_preload_libraries = 'pgnodemx'" >> "$config_file"
+          echo "pgnodemx.subtree_enabled = on" >> "$config_file"
+          # Limit delegated controllers to those reliably available in Docker
+          # (cpuset requires extra setup and is not needed for these tests).
+          echo "pgnodemx.delegated_controllers = '+cpu +memory +io'" >> "$config_file"
+          exec bash ci/setup-subtree-cgroups-github.sh ${{ matrix.pg }}
+
+      - name: Run subtree regression tests
+        run: make USE_PGXS=1 installcheck REGRESS=pgnodemx_subtree_regress
+
+      - name: Show regression.diffs
+        if: ${{ failure() }}
+        run: cat regression.diffs || true
