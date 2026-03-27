@@ -796,6 +796,10 @@ set_cgpath(void)
 {
 	char		   *ftr = PROC_CGROUP_FILE;
 
+	/* ERROR here will break all ability to connect; guard against disabled cgroup */
+	if (!cgroup_enabled)
+		return;
+
 	init_or_reset_cgpath();
 
 	/* obtain a list of cgroup controllers */

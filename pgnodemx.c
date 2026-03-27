@@ -286,9 +286,12 @@ _PG_init(void)
 	 */
 	proc_enabled = check_procfs();
 
-	/* Install backend session post-auth hook */
-	next_client_auth_hook = ClientAuthentication_hook;
-	ClientAuthentication_hook = CA_hook;
+	/* Install backend session post-auth hook only if cgroup is enabled */
+	if (cgroup_enabled)
+	{
+		next_client_auth_hook = ClientAuthentication_hook;
+		ClientAuthentication_hook = CA_hook;
+	}
 
 	inited = true;
 }
