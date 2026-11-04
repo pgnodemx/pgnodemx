@@ -1,4 +1,4 @@
-/* contrib/pgnodemx/pgnodemx--2.0.sql */
+/* contrib/pgnodemx/pgnodemx--2.1.sql */
 
 -- complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "CREATE EXTENSION pgnodemx" to load this file. \quit
@@ -126,10 +126,18 @@ RETURNS SETOF record
 AS 'MODULE_PATHNAME', 'pgnodemx_kdapi_setof_kv'
 LANGUAGE C STABLE STRICT;
 
-CREATE FUNCTION fips_mode()
-RETURNS BOOL
-AS 'MODULE_PATHNAME', 'pgnodemx_fips_mode'
-LANGUAGE C STABLE STRICT;
+-- pgcrypto 1.4 (PostgreSQL 18) has its own fips_mode(); creating ours too
+-- would make CREATE EXTENSION fail for whichever comes second in a schema.
+DO $$
+BEGIN
+  IF current_setting('server_version_num')::int < 180000 THEN
+    CREATE FUNCTION fips_mode()
+    RETURNS BOOL
+    AS 'MODULE_PATHNAME', 'pgnodemx_fips_mode'
+    LANGUAGE C STABLE STRICT;
+  END IF;
+END
+$$;
 
 CREATE FUNCTION symbol_filename(TEXT)
 RETURNS TEXT
