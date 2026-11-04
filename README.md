@@ -184,6 +184,7 @@ SELECT * FROM fsinfo(path text);
 SELECT fips_mode();
 ```
 * Returns TRUE if openssl is currently running in FIPS mode, otherwise FALSE.
+* Only created on PostgreSQL 17 and older. From PostgreSQL 18 on, use pgcrypto's ```fips_mode()```, which does the same thing; updating to pgnodemx 2.1 on PostgreSQL 18 drops pgnodemx's copy, so both extensions can be created in the same schema.
 
 ### Get openssl version string
 ```
